@@ -109,6 +109,14 @@ const inser_multi_vectors = async () => {
     return upsertResponse
 }
 
+const delete_vectors = async (ids) => {
+    const index = pinecone.Index(PINECONE_INDEX);
+    await index.delete1({
+        ...(ids ? { ids } : { deleteAll: true }),
+        namespace: PINECONE_NAMESPACE,
+    });
+}
+
 (async () => {
     // https://github.com/mInzamamMalik/vector-database-hello-world/tree/main
     const text = "Hello World"
@@ -123,5 +131,7 @@ const inser_multi_vectors = async () => {
     // console.log(data);
 
     // await inser_multi_vectors()
+
+    // await delete_vectors()
 })()
 
