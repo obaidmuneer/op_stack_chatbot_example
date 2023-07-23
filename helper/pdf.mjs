@@ -20,3 +20,13 @@ export const pdf_to_text = (file_name) => {
 }
 
 // console.log(await pdf_to_text('obaidmuneer.pdf'));
+
+export const ingest_pdf = async (name_of_file, chuck_size, chunk_overlap) => {
+    const text = await pdf_to_text(name_of_file)
+    const cleanedText = String(text.replace(/[\r\n]+/g, ""));
+    // console.log(cleanedText);
+    const chunks = create_chunks(cleanedText, chuck_size, chunk_overlap) // modify the chunks and overlap size according to your need
+    await inser_multi_vectors(chunks)
+    // console.log(chunks);
+}
+// await ingest_pdf()
