@@ -1,8 +1,15 @@
-import { PineconeClient } from "@pinecone-database/pinecone";
 import { Configuration, OpenAIApi } from "openai";
-import { OPENAI_API_KEY } from './config/openai.mjs'
-import { PINECONE_API_KEY, PINECONE_ENVIRONMENT, PINECONE_INDEX, PINECONE_NAMESPACE } from './config/pinecone.mjs'
+import fs from 'fs'
 import { nanoid } from 'nanoid'
+import { OPENAI_API_KEY } from './config/openai.mjs'
+import { PineconeClient } from "@pinecone-database/pinecone";
+import { pdf_to_text } from "./helper/read_pdf.mjs";
+import {
+    PINECONE_API_KEY,
+    PINECONE_ENVIRONMENT,
+    PINECONE_INDEX,
+    PINECONE_NAMESPACE
+} from './config/pinecone.mjs'
 
 const configuration = new Configuration({
     apiKey: OPENAI_API_KEY,
@@ -24,10 +31,10 @@ const create_embedding = async (text) => {
         model: 'text-embedding-ada-002',
         input: text
     })
-    return res.data
+    return res
 }
 
-const injest_vector = async (vectors, text) => {
+const insert_single_vector = async (vectors, text) => {
     const index = pinecone.Index(PINECONE_INDEX);
     const upsertRequest = {
         vectors: [
@@ -42,7 +49,7 @@ const injest_vector = async (vectors, text) => {
         namespace: PINECONE_NAMESPACE,
     };
     const upsertResponse = await index.upsert({ upsertRequest });
-    console.log(upsertResponse);
+    return upsertResponse
 }
 
 const get_vector_ids = async () => {
@@ -69,13 +76,52 @@ const query_vector = async (vectors, k) => {
     return data
 }
 
+const inser_multi_vectors = async () => {
+    const index = pinecone.Index(PINECONE_INDEX);
+    const questions = JSON.parse(fs.readFileSync('./data/questions.json'))
+    // console.log(json);
+    console.log('converting all doc into vectors');
+    const embededQuestions = questions.map(async (question) => {
+        const text = `serial: ${question.serial}, question: ${question.question}, answer: ${question.answer}`
+        const res = await create_embedding(text)
+
+        return {
+            id: nanoid(),
+            values: res.data.data[0].embedding,
+            metadata: {
+                text: JSON.parse(res.config.data).input
+            },
+        }
+    })
+
+    const vectoredQuestions = await Promise.all(embededQuestions)
+    console.log('converted all doc into vectors');
+    // console.log(vectoredQuestions);
+    console.log('inserting vector into pinecone');
+
+    const upsertRequest = {
+        vectors: vectoredQuestions,
+        namespace: PINECONE_NAMESPACE,
+    };
+    const upsertResponse = await index.upsert({ upsertRequest });
+    console.log('inserted vector into pinecone');
+    console.log(upsertResponse);
+    return upsertResponse
+}
+
 (async () => {
-    const text = "How re you?"
-    const res = await create_embedding(text)
-    const vectors = res.data[0].embedding
+    // https://github.com/mInzamamMalik/vector-database-hello-world/tree/main
+    const text = "Hello World"
+    // const res = await create_embedding(text)
+    // console.log(JSON.parse(res.config.data).input);
+    // const vectors = res.data[0].embedding
     // console.log(res.data[0].embedding);
-    // await injest_vector(vectors, text)
-    const data = await query_vector(vectors, 4)
-    console.log(data);
+
+    // await insert_single_vector(vectors, text)
+
+    // const data = await query_vector(vectors, 4)
+    // console.log(data);
+
+    // await inser_multi_vectors()
 })()
 
