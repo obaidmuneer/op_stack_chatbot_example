@@ -1,4 +1,5 @@
 import { chain, create_embedding, text_generator } from "./helper/openai.mjs";
+import { ingest_pdf } from "./helper/pdf.mjs";
 import {
     query_vector,
     insert_single_vector,
@@ -62,5 +63,8 @@ const askMan = () => {
 
     // =========  delete all vector or by ids pass ids in arr
     // await delete_vectors()
+
+    // ========= ingest pdf
+    // await ingest_pdf('obaidmuneer.pdf',1000,200) // place your file in data folder , chunk_size, chunk_overlap
 })()
 

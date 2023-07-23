@@ -63,14 +63,13 @@ export const query_vector = async (vectors, k) => {
     return data
 }
 
-export const inser_multi_vectors = async () => {
+export const inser_multi_vectors = async (str_arr) => {
     const index = pinecone.Index(PINECONE_INDEX);
-    const questions = JSON.parse(fs.readFileSync('./data/questions.json'))
+    // const questions = JSON.parse(fs.readFileSync('./data/questions.json'))
     // console.log(json);
     console.log('converting all doc into vectors');
-    const embededQuestions = questions.map(async (question) => {
-        const text = `serial: ${question.serial}, question: ${question.question}, answer: ${question.answer}`
-        const res = await create_embedding(text)
+    const embededQuestions = str_arr.map(async (str) => {
+        const res = await create_embedding(str)
 
         return {
             id: nanoid(),
