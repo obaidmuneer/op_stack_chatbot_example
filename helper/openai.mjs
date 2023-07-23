@@ -8,18 +8,25 @@ const configuration = new Configuration({
 
 const openai = new OpenAIApi(configuration)
 
-const INSTRUCTION = `You are AI assistant at AI2travel, Greet user in friendly way, Answer the question using the provided context below.
-If the answer is not contained in the context, say "Sorry, I don't have that information.".`
+const INSTRUCTION = `You are an AI assistant at AI2travel, and your primary goal is to help users by answering their questions in a friendly and conversational manner. The user's question will be presented within triple quotes for clarity.
 
-const template = `
-Context: {CONTEXT}
-    
-Question: {QUERY}
+Before providing an answer, you should first analyze whether the user's question is related to the given context or the chat history. If the question is related to the context, answer it based on the provided information in the "Context" section. If the question is related to the chat history, answer it accordingly based on the past conversation provided in the "Chat History" section.
 
-Your Answer: `;
+If the user's question is not covered by the context or the chat history, respond with "Sorry, I don't have that information."
 
-const getPrompt = (context, query) => {
-    return template.replace('{CONTEXT}', `${context}`).replace('{QUERY}', `${query}`)
+Please note that the chat history will be enclosed in angle brackets, "< >", and the context will be enclosed in braces, "{ }".`
+
+const template = `**Context:** {CONTEXT}
+
+**Chat History:** {CHAT_HISTORY}
+
+**Question:** {QUERY}
+
+**Your Answer in markdown:**
+`
+
+const getPrompt = (context, query, chat_history) => {
+    return template.replace('{CONTEXT}', `{${context}}`).replace('{QUERY}', `'''${query}'''`).replace('{CHAT_HISTORY}', `<\n${chat_history}>`)
 }
 
 const history = []
@@ -33,19 +40,13 @@ export const text_generator = async (context, query) => {
         { role: "system", content: INSTRUCTION }
     ];
 
-    history.forEach(([query, ans]) => {
-        messages.push({
-            role: 'user',
-            content: query,
-        });
+    let chat_history = ''
 
-        messages.push({
-            role: 'assistant',
-            content: ans,
-        });
+    history.forEach(([query, ans]) => {
+        chat_history += `user: ${query} \nassistant: ${ans} \n`
     })
 
-    messages.push({ role: "user", content: getPrompt(context, query) })
+    messages.push({ role: "user", content: getPrompt(context, query, chat_history) })
 
     const res = await openai.createChatCompletion({
         model: "gpt-3.5-turbo",
@@ -53,8 +54,8 @@ export const text_generator = async (context, query) => {
     });
     history.push([query, res.data.choices[0].message.content])
     // messages.push(res.data.choices[0].message)
-    // console.log(messages);
-    // console.log(history);
+    console.log(messages);
+    // console.log(chat_history);
     return res.data.choices[0].message.content
 }
 
