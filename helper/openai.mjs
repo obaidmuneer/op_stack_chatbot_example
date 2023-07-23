@@ -21,19 +21,41 @@ Your Answer: `;
 const getPrompt = (context, query) => {
     return template.replace('{CONTEXT}', `${context}`).replace('{QUERY}', `${query}`)
 }
-const messages = [
-    { role: "system", content: INSTRUCTION }
-];
+
+const history = []
+
+// const messages = [
+//     { role: "system", content: INSTRUCTION }
+// ];
 
 export const text_generator = async (context, query) => {
+    const messages = [
+        { role: "system", content: INSTRUCTION }
+    ];
+
+    history.forEach(([query, ans]) => {
+        messages.push({
+            role: 'user',
+            content: query,
+        });
+
+        messages.push({
+            role: 'assistant',
+            content: ans,
+        });
+    })
+
     messages.push({ role: "user", content: getPrompt(context, query) })
+
     const res = await openai.createChatCompletion({
         model: "gpt-3.5-turbo",
         messages: messages,
     });
-    messages.push(res.data.choices[0].message)
+    history.push([query, res.data.choices[0].message.content])
+    // messages.push(res.data.choices[0].message)
     // console.log(messages);
-    return messages
+    // console.log(history);
+    return res.data.choices[0].message.content
 }
 
 export const create_embedding = async (text) => {

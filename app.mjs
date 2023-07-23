@@ -18,8 +18,8 @@ const askMan = () => {
             ])
             .then(async (answers) => {
                 // console.log(answers.query);
-                const msgs = await chain(answers.query)
-                const ans = msgs.reverse()[0].content
+                const res = await chain(answers.query)
+                const ans = res
 
                 if (answers.query != 0) {
                     ask(`${ans} \n `)
