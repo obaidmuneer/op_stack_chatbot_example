@@ -1,137 +1,66 @@
-import { Configuration, OpenAIApi } from "openai";
-import fs from 'fs'
-import { nanoid } from 'nanoid'
-import { OPENAI_API_KEY } from './config/openai.mjs'
-import { PineconeClient } from "@pinecone-database/pinecone";
-import { pdf_to_text } from "./helper/read_pdf.mjs";
+import { chain, create_embedding, text_generator } from "./helper/openai.mjs";
 import {
-    PINECONE_API_KEY,
-    PINECONE_ENVIRONMENT,
-    PINECONE_INDEX,
-    PINECONE_NAMESPACE
-} from './config/pinecone.mjs'
+    query_vector,
+    insert_single_vector,
+    inser_multi_vectors,
+    delete_vectors
+} from "./helper/pinecone.mjs";
+import inquirer from 'inquirer';
 
-const configuration = new Configuration({
-    apiKey: OPENAI_API_KEY,
-});
+const askMan = () => {
+    const ask = (query) => {
+        inquirer
+            .prompt([
+                {
+                    name: 'query',
+                    message: query ?? "What you want to ask? to exit prompt enter 0 \n"
+                }
+            ])
+            .then(async (answers) => {
+                // console.log(answers.query);
+                const msgs = await chain(answers.query)
+                const ans = msgs.reverse()[0].content
 
-// Create a client
-const pinecone = new PineconeClient();
-
-// Initialize the client
-await pinecone.init({
-    apiKey: PINECONE_API_KEY,
-    environment: PINECONE_ENVIRONMENT,
-});
-
-const openai = new OpenAIApi(configuration)
-
-const create_embedding = async (text) => {
-    const res = await openai.createEmbedding({
-        model: 'text-embedding-ada-002',
-        input: text
-    })
-    return res
+                if (answers.query != 0) {
+                    ask(`${ans} \n `)
+                }
+            })
+    }
+    ask()
 }
-
-const insert_single_vector = async (vectors, text) => {
-    const index = pinecone.Index(PINECONE_INDEX);
-    const upsertRequest = {
-        vectors: [
-            {
-                id: nanoid(),
-                values: vectors,
-                metadata: {
-                    text: text,
-                },
-            },
-        ],
-        namespace: PINECONE_NAMESPACE,
-    };
-    const upsertResponse = await index.upsert({ upsertRequest });
-    return upsertResponse
-}
-
-const get_vector_ids = async () => {
-    // https://stackoverflow.com/questions/76365604/is-there-a-method-to-fetch-all-the-vectors-of-a-namespace-in-pinecone/76723753#76723753
-    const res = await create_embedding("")
-    const vectors = res.data[0].embedding
-    const res2 = await query_vector(vectors, 10000)
-    const ids = res2.map(r => r.id)
-    return ids
-}
-
-const query_vector = async (vectors, k) => {
-    const index = pinecone.Index(PINECONE_INDEX);
-    const queryRequest = {
-        vector: vectors, // query vector index
-        topK: k, // number of result to return
-        includeValues: false, // true to get vector index
-        includeMetadata: true, // to get orignal data
-        namespace: PINECONE_NAMESPACE,
-    };
-    // https://docs.pinecone.io/docs/metadata-filtering
-    const queryResponse = await index.query({ queryRequest });
-    const data = queryResponse.matches.map((eachMatched) => eachMatched)
-    return data
-}
-
-const inser_multi_vectors = async () => {
-    const index = pinecone.Index(PINECONE_INDEX);
-    const questions = JSON.parse(fs.readFileSync('./data/questions.json'))
-    // console.log(json);
-    console.log('converting all doc into vectors');
-    const embededQuestions = questions.map(async (question) => {
-        const text = `serial: ${question.serial}, question: ${question.question}, answer: ${question.answer}`
-        const res = await create_embedding(text)
-
-        return {
-            id: nanoid(),
-            values: res.data.data[0].embedding,
-            metadata: {
-                text: JSON.parse(res.config.data).input
-            },
-        }
-    })
-
-    const vectoredQuestions = await Promise.all(embededQuestions)
-    console.log('converted all doc into vectors');
-    // console.log(vectoredQuestions);
-    console.log('inserting vector into pinecone');
-
-    const upsertRequest = {
-        vectors: vectoredQuestions,
-        namespace: PINECONE_NAMESPACE,
-    };
-    const upsertResponse = await index.upsert({ upsertRequest });
-    console.log('inserted vector into pinecone');
-    console.log(upsertResponse);
-    return upsertResponse
-}
-
-const delete_vectors = async (ids) => {
-    const index = pinecone.Index(PINECONE_INDEX);
-    await index.delete1({
-        ...(ids ? { ids } : { deleteAll: true }),
-        namespace: PINECONE_NAMESPACE,
-    });
-}
-
 (async () => {
     // https://github.com/mInzamamMalik/vector-database-hello-world/tree/main
-    const text = "Hello World"
-    // const res = await create_embedding(text)
-    // console.log(JSON.parse(res.config.data).input);
-    // const vectors = res.data[0].embedding
-    // console.log(res.data[0].embedding);
+    askMan()
 
+    // ========= user's question
+    // const text = "How do I book a flight" 
+
+    // ========= create embedding
+    // const res = await create_embedding(text)
+
+    // ========= user's data embedding
+    // const vectors = res.data.data[0].embedding 
+    // console.log(vectors);
+
+    // ========= user's orignal text
+    // const userData = JSON.parse(res.config.data).input
+    // console.log(userData); // parse user's data after embedding
+
+    // ========= insert single vector
     // await insert_single_vector(vectors, text)
 
-    // const data = await query_vector(vectors, 4)
-    // console.log(data);
+    // ========= ask your question 
+    // const data = await query_vector(vectors, 2)
+    // const context = data.map(d => d.metadata.text).join(" ")
+    // console.log(context);
+    // const res2 = await text_generator(context, text)
+    // console.log(res2); // arr of msgs
+    // ========= 
 
+    // ========= insert multiple vectors to pinecone
     // await inser_multi_vectors()
 
+    // =========  delete all vector or by ids pass ids in arr
     // await delete_vectors()
 })()
 
